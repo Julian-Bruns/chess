@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Chess, type Color, type Move, type PieceSymbol, type Square } from 'chess.js';
-import { Activity, RotateCcw, Timer } from 'lucide-react';
+import { Activity, Download, RotateCcw, Timer } from 'lucide-react';
 import { applyMove, applyUciMove, legalMovesFor, promotionChoicesFor, squareName, type BoardMove } from './chess/chessRules';
 import { createEngineTransport } from './engine/transport';
 import { UciEngine } from './engine/uci';
 import type { EngineStatus, SearchInfo } from './engine/types';
+import { updateEverything } from './platform/updates';
 
 type LastMove = {
   from: Square;
@@ -33,6 +34,8 @@ export default function App() {
   const [engineText, setEngineText] = useState('Stockfish');
   const [engineInfo, setEngineInfo] = useState<SearchInfo>({});
   const [thinking, setThinking] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updateNotice, setUpdateNotice] = useState<string | null>(null);
 
   const game = useMemo(() => new Chess(fen), [fen]);
   const engineRef = useRef<UciEngine | null>(null);
@@ -42,6 +45,15 @@ export default function App() {
   useEffect(() => {
     moveTimeRef.current = moveTimeMs;
   }, [moveTimeMs]);
+
+  useEffect(() => {
+    if (!updateNotice || updating) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => setUpdateNotice(null), 9000);
+    return () => window.clearTimeout(timeout);
+  }, [updateNotice, updating]);
 
   useEffect(() => {
     const transport = createEngineTransport();
@@ -184,18 +196,53 @@ export default function App() {
     clearSelection();
   }, [clearSelection]);
 
+  const handleUpdate = useCallback(async () => {
+    if (updating) {
+      return;
+    }
+
+    setUpdating(true);
+    setUpdateNotice('Checking updates');
+
+    try {
+      const result = await updateEverything();
+      setUpdateNotice(result.message);
+      setEngineText(result.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Update failed';
+      setUpdateNotice(message);
+      setEngineText(message);
+    } finally {
+      setUpdating(false);
+    }
+  }, [updating]);
+
   const status = getGameStatus(game, thinking, engineStatus, engineInfo);
+  const displayStatus = updateNotice ?? status;
 
   return (
     <main className="app-shell">
       <section className="top-bar" aria-label="Game status">
         <div className="engine-pill" data-state={engineStatus}>
           <Activity size={17} strokeWidth={2} aria-hidden="true" />
-          <span>{status}</span>
+          <span>{displayStatus}</span>
         </div>
-        <button className="icon-button" type="button" onClick={resetGame} aria-label="New game" title="New game">
-          <RotateCcw size={20} strokeWidth={2} aria-hidden="true" />
-        </button>
+        <div className="top-actions">
+          <button
+            className="icon-button"
+            type="button"
+            onClick={handleUpdate}
+            aria-label="Update Chessfish and Stockfish"
+            title="Update Chessfish and Stockfish"
+            disabled={updating}
+            data-busy={updating || undefined}
+          >
+            <Download size={20} strokeWidth={2} aria-hidden="true" />
+          </button>
+          <button className="icon-button" type="button" onClick={resetGame} aria-label="New game" title="New game">
+            <RotateCcw size={20} strokeWidth={2} aria-hidden="true" />
+          </button>
+        </div>
       </section>
 
       <section className="board-wrap" aria-label="Chess board">

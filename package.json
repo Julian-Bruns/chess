@@ -1,7 +1,7 @@
 {
-  "name": "local-stockfish-chess",
+  "name": "chessfish",
   "version": "0.1.0",
-  "description": "Minimal local Stockfish chess app for macOS and Android.",
+  "description": "Chessfish, a local Stockfish chess app for macOS and Android.",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -14,6 +14,9 @@
     "electron:pack": "npm run build && electron-builder --mac",
     "cap:sync": "npm run build && cap sync android",
     "android:open": "npm run cap:sync && cap open android",
+    "android:debug": "npm run cap:sync && cd android && ./gradlew assembleDebug",
+    "android:release:apk": "npm run cap:sync && cd android && ./gradlew assembleRelease",
+    "android:release:aab": "npm run cap:sync && cd android && ./gradlew bundleRelease",
     "update:pieces": "node scripts/download-pieces.mjs",
     "update:stockfish": "node scripts/update-stockfish.mjs"
   },
@@ -57,10 +60,14 @@
   },
   "build": {
     "appId": "com.julianbruns.localstockfishchess",
-    "productName": "Local Stockfish Chess",
+    "productName": "Chessfish",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**",
       "electron/**",
+      "build/icon.png",
       "package.json"
     ],
     "extraResources": [
@@ -75,6 +82,7 @@
     ],
     "mac": {
       "category": "public.app-category.games",
+      "icon": "build/icon.icns",
       "target": [
         "dmg"
       ]

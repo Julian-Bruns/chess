@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const execFileAsync = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const apiUrl = 'https://api.github.com/repos/official-stockfish/Stockfish/releases/latest';
+const userAgent = 'chessfish/0.1.0';
 
 const targets = [
   {
@@ -51,7 +52,7 @@ const targets = [
 async function download(url, outPath) {
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'local-stockfish-chess/0.1.0'
+      'User-Agent': userAgent
     },
     redirect: 'follow'
   });
@@ -84,7 +85,7 @@ async function fetchLatestRelease() {
   const response = await fetch(apiUrl, {
     headers: {
       'Accept': 'application/vnd.github+json',
-      'User-Agent': 'local-stockfish-chess/0.1.0'
+      'User-Agent': userAgent
     }
   });
 

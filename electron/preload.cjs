@@ -16,3 +16,7 @@ contextBridge.exposeInMainWorld('stockfish', {
     return () => ipcRenderer.removeListener('stockfish:status', listener);
   }
 });
+
+contextBridge.exposeInMainWorld('chessfish', {
+  updateEverything: () => ipcRenderer.invoke('app:updateEverything')
+});

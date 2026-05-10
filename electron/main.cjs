@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { execFile, execFileSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
@@ -7,6 +7,9 @@ const os = require('node:os');
 const path = require('node:path');
 
 const stockfishApi = 'https://api.github.com/repos/official-stockfish/Stockfish/releases/latest';
+const appReleaseApi = 'https://api.github.com/repos/Julian-Bruns/chess/releases/tags/latest';
+const appName = 'Chessfish';
+const userAgent = 'chessfish/0.1.0';
 
 let mainWindow = null;
 let engineProcess = null;
@@ -20,7 +23,8 @@ function createWindow() {
     minWidth: 360,
     minHeight: 560,
     backgroundColor: '#10100e',
-    title: 'Local Stockfish Chess',
+    title: appName,
+    icon: path.join(__dirname, '..', 'build', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -33,6 +37,7 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 }
 
+app.setName(appName);
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
@@ -50,6 +55,10 @@ app.on('activate', () => {
 
 ipcMain.handle('stockfish:checkForUpdate', async () => {
   return checkForUpdate();
+});
+
+ipcMain.handle('app:updateEverything', async () => {
+  return updateEverything();
 });
 
 ipcMain.handle('stockfish:start', async () => {
@@ -140,6 +149,140 @@ async function checkForUpdate() {
   }
 
   return updatePromise;
+}
+
+async function updateEverything() {
+  const result = {
+    status: 'unavailable',
+    message: '',
+    engineUpdate: null,
+    appUpdate: null
+  };
+
+  try {
+    result.engineUpdate = await checkForUpdate();
+  } catch (error) {
+    result.engineUpdate = {
+      updated: false,
+      message: error instanceof Error ? error.message : 'Could not update Stockfish'
+    };
+  }
+
+  try {
+    result.appUpdate = await downloadLatestAppInstaller();
+  } catch (error) {
+    result.appUpdate = {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Could not update Chessfish'
+    };
+  }
+
+  const appUpdate = result.appUpdate;
+  const engineUpdate = result.engineUpdate;
+
+  if (appUpdate?.status === 'opened') {
+    return {
+      status: 'opened',
+      message: engineUpdate?.updated
+        ? 'Stockfish updated. Finish the Chessfish installer to update the app.'
+        : appUpdate.message,
+      releaseTag: appUpdate.releaseTag,
+      path: appUpdate.path,
+      engineUpdate,
+      appUpdate
+    };
+  }
+
+  if (engineUpdate?.updated) {
+    return {
+      status: 'updated',
+      message: 'Stockfish updated. No app installer is available.',
+      engineUpdate,
+      appUpdate
+    };
+  }
+
+  return {
+    status: appUpdate?.status ?? 'unavailable',
+    message: appUpdate?.message || engineUpdate?.message || 'No updates are available.',
+    releaseTag: appUpdate?.releaseTag,
+    path: appUpdate?.path,
+    engineUpdate,
+    appUpdate
+  };
+}
+
+async function downloadLatestAppInstaller() {
+  if (process.platform !== 'darwin') {
+    return {
+      status: 'unavailable',
+      message: 'App installer updates are only enabled for the macOS app.'
+    };
+  }
+
+  let release;
+  try {
+    release = await getJson(appReleaseApi);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Could not read latest release';
+    return {
+      status: 'unavailable',
+      message: `${detail}. Publish the latest release assets publicly, or download them from GitHub Actions.`
+    };
+  }
+
+  const asset = selectMacInstallerAsset(release.assets ?? []);
+  if (!asset?.browser_download_url) {
+    return {
+      status: 'unavailable',
+      releaseTag: release.tag_name,
+      message: 'No macOS Chessfish installer was found in the latest release.'
+    };
+  }
+
+  const updateDir = path.join(app.getPath('downloads'), 'Chessfish Updates');
+  const installerPath = path.join(updateDir, safeFileName(asset.name));
+  await fsp.mkdir(updateDir, { recursive: true });
+
+  let shouldDownload = true;
+  try {
+    const stat = await fsp.stat(installerPath);
+    shouldDownload = Number(asset.size) > 0 && stat.size !== Number(asset.size);
+  } catch {
+    shouldDownload = true;
+  }
+
+  if (shouldDownload) {
+    await download(asset.browser_download_url, installerPath);
+  }
+
+  const openError = await shell.openPath(installerPath);
+  if (openError) {
+    throw new Error(openError);
+  }
+
+  return {
+    status: 'opened',
+    releaseTag: release.tag_name,
+    path: installerPath,
+    message: 'Finish the Chessfish installer to update the app.'
+  };
+}
+
+function selectMacInstallerAsset(assets) {
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  const installers = assets.filter((asset) => /\.dmg$/i.test(asset.name ?? ''));
+  return (
+    installers.find((asset) => new RegExp(`chessfish.*macos.*${arch}`, 'i').test(asset.name)) ??
+    installers.find((asset) => new RegExp(`chessfish.*${arch}`, 'i').test(asset.name)) ??
+    installers.find((asset) => /chessfish.*macos/i.test(asset.name)) ??
+    installers.find((asset) => /chessfish/i.test(asset.name)) ??
+    installers[0]
+  );
+}
+
+function safeFileName(name) {
+  return String(name || 'Chessfish.dmg').replace(/[/:\\]/g, '-');
 }
 
 async function updateStockfish() {
@@ -313,7 +456,7 @@ function getJson(url) {
     const request = https.get(url, {
       headers: {
         Accept: 'application/vnd.github+json',
-        'User-Agent': 'local-stockfish-chess/0.1.0'
+        'User-Agent': userAgent
       }
     }, (response) => {
       if (!response.statusCode || response.statusCode >= 400) {
@@ -345,7 +488,7 @@ function download(url, outPath) {
     const file = fs.createWriteStream(outPath);
     https.get(url, {
       headers: {
-        'User-Agent': 'local-stockfish-chess/0.1.0'
+        'User-Agent': userAgent
       }
     }, (response) => {
       if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {

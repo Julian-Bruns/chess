@@ -31,7 +31,7 @@ async function downloadSvg(file) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'local-stockfish-chess/0.1.0 (development asset downloader)'
+        'User-Agent': 'chessfish/0.1.0 (development asset downloader)'
       },
       redirect: 'follow'
     });

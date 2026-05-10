@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.julianbruns.localstockfishchess',
-  appName: 'Local Stockfish Chess',
+  appName: 'Chessfish',
   webDir: 'dist',
   bundledWebRuntime: false,
   plugins: {

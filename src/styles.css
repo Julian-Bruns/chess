@@ -81,6 +81,12 @@ input {
   white-space: nowrap;
 }
 
+.top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .engine-pill[data-state="ready"] svg,
 .engine-pill[data-state="thinking"] svg {
   color: #8fd18d;
@@ -105,6 +111,21 @@ input {
 
 .icon-button:hover {
   border-color: rgba(255, 255, 255, 0.3);
+}
+
+.icon-button:disabled {
+  cursor: progress;
+  opacity: 0.68;
+}
+
+.icon-button[data-busy="true"] svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .board-wrap {
