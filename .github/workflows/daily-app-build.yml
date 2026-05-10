@@ -171,6 +171,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          cat > release-notes.md <<EOF
+          Download for Android: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android.apk
+
+          Download for macOS: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-macos.dmg
+
+          Android install guide: https://github.com/Julian-Bruns/chess/blob/main/docs/android-install.md
+
+          Automated Chessfish build from $GITHUB_SHA.
+          EOF
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -f latest "$GITHUB_SHA"
@@ -179,23 +189,11 @@ jobs:
           if gh release view latest >/dev/null 2>&1; then
             gh release edit latest \
               --title "Latest Chessfish build" \
-              --notes "Download for Android: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android.apk
-
-Download for macOS: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-macos.dmg
-
-Android install guide: https://github.com/Julian-Bruns/chess/blob/main/docs/android-install.md
-
-Automated Chessfish build from $GITHUB_SHA."
+              --notes-file release-notes.md
           else
             gh release create latest \
               --title "Latest Chessfish build" \
-              --notes "Download for Android: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android.apk
-
-Download for macOS: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-macos.dmg
-
-Android install guide: https://github.com/Julian-Bruns/chess/blob/main/docs/android-install.md
-
-Automated Chessfish build from $GITHUB_SHA."
+              --notes-file release-notes.md
           fi
 
           gh release upload latest release-assets/* --clobber
