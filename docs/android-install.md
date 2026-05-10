@@ -10,7 +10,7 @@ https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android
 
 If the browser asks what to do with the file, choose **Download**.
 
-This link starts working after the first signed Android release is published by the daily build.
+This link starts working after the GitHub workflow has published the first `latest` release. If it shows a GitHub 404 page, the release has not been built yet, the APK was not published, or the repository/release is private.
 
 ## Install
 

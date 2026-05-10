@@ -8,7 +8,7 @@ Android users can install Chessfish from this fixed APK link:
 
 https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android.apk
 
-Beginner-friendly Android steps are in [docs/android-install.md](docs/android-install.md). Share that page with players instead of the build instructions below.
+Beginner-friendly Android steps are in [docs/android-install.md](docs/android-install.md). Share that page with players instead of the build instructions below. The link starts working after the GitHub workflow has published the first `latest` release.
 
 macOS users can download the latest DMG here:
 
