@@ -68,6 +68,7 @@ export default function App() {
   const [engineInfo, setEngineInfo] = useState<SearchInfo>({});
   const [evaluations, setEvaluations] = useState<Record<string, SearchEvaluation>>({});
   const [thinking, setThinking] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateNotice, setUpdateNotice] = useState<string | null>(null);
   const [updateActionLabel, setUpdateActionLabel] = useState('Install update');
@@ -180,6 +181,7 @@ export default function App() {
       score: '',
       mode: 'evaluation'
     };
+    setAnalyzing(true);
     setEngineInfo({});
 
     try {
@@ -196,6 +198,7 @@ export default function App() {
     } finally {
       if (searchSerial.current === serial) {
         currentSearchRef.current = null;
+        setAnalyzing(false);
       }
     }
   }, [showEvalBar]);
@@ -205,12 +208,22 @@ export default function App() {
       searchSerial.current += 1;
       engineRef.current?.stopSearch();
       currentSearchRef.current = null;
+      setAnalyzing(false);
       setEngineInfo({});
     }
   }, [showEvalBar]);
 
   useEffect(() => {
-    if (!showEvalBar || thinking || engineStatus !== 'ready' || activeEvaluation || game.isGameOver() || game.turn() !== 'w') {
+    if (
+      !showEvalBar ||
+      thinking ||
+      analyzing ||
+      engineStatus !== 'ready' ||
+      activeEvaluation ||
+      gameState.index === 0 ||
+      game.isGameOver() ||
+      game.turn() !== 'w'
+    ) {
       return undefined;
     }
 
@@ -219,7 +232,7 @@ export default function App() {
     }, 120);
 
     return () => window.clearTimeout(timeout);
-  }, [activeEvaluation, engineStatus, fen, game, requestPositionEvaluation, showEvalBar, thinking]);
+  }, [activeEvaluation, analyzing, engineStatus, fen, game, gameState.index, requestPositionEvaluation, showEvalBar, thinking]);
 
   const requestEngineMove = useCallback(async (positionFen: string) => {
     const engine = engineRef.current;
@@ -247,7 +260,6 @@ export default function App() {
       }
 
       const applied = applyUciMove(positionFen, bestMove);
-      const nextGame = new Chess(applied.fen);
       const moveEntry = toHistoryMove(applied.move);
       setGameState((current) => {
         const latestIndex = current.entries.length - 1;
@@ -274,10 +286,6 @@ export default function App() {
       setEngineText('ready');
       setThinking(false);
       currentSearchRef.current = null;
-
-      if (!nextGame.isGameOver()) {
-        void requestPositionEvaluation(applied.fen);
-      }
     } catch (error) {
       if (searchSerial.current === serial) {
         setEngineStatus('error');
@@ -289,12 +297,13 @@ export default function App() {
         currentSearchRef.current = null;
       }
     }
-  }, [requestPositionEvaluation]);
+  }, []);
 
   const commitUserMove = useCallback((move: BoardMove) => {
     searchSerial.current += 1;
     engineRef.current?.stopSearch();
     currentSearchRef.current = null;
+    setAnalyzing(false);
     setThinking(false);
 
     const applied = applyMove(fen, move);
@@ -379,6 +388,7 @@ export default function App() {
     setEngineInfo({});
     setEvaluations({});
     setThinking(false);
+    setAnalyzing(false);
     clearSelection();
   }, [clearSelection]);
 
@@ -387,6 +397,7 @@ export default function App() {
     engineRef.current?.stopSearch();
     currentSearchRef.current = null;
     setThinking(false);
+    setAnalyzing(false);
     setPromotion(null);
     setEngineInfo({});
     clearSelection();
