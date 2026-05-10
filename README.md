@@ -2,6 +2,18 @@
 
 Chessfish is a one-board chess app for playing White against local Stockfish.
 
+## Download For Players
+
+Android users can install Chessfish from this fixed APK link:
+
+https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android.apk
+
+Beginner-friendly Android steps are in [docs/android-install.md](docs/android-install.md). Share that page with players instead of the build instructions below.
+
+macOS users can download the latest DMG here:
+
+https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-macos.dmg
+
 ## What Is Included
 
 - React/Vite shared board UI.
@@ -14,7 +26,7 @@ Chessfish is a one-board chess app for playing White against local Stockfish.
 - Cburnett SVG chess piece icons downloaded by `npm run update:pieces`.
 - A scheduled GitHub Actions workflow that refreshes Stockfish and uploads app artifacts every day.
 
-## Install As Applications
+## Build As Applications
 
 Install dependencies once:
 

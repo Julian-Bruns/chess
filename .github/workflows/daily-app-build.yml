@@ -124,7 +124,7 @@ jobs:
         run: |
           mkdir -p artifacts
           for dmg in release/*.dmg; do
-            cp "$dmg" "artifacts/chessfish-macos-${RUNNER_ARCH}.dmg"
+            cp "$dmg" "artifacts/chessfish-macos.dmg"
           done
 
       - name: Upload macOS DMG
@@ -176,11 +176,23 @@ jobs:
           if gh release view latest >/dev/null 2>&1; then
             gh release edit latest \
               --title "Latest Chessfish build" \
-              --notes "Automated Chessfish build from $GITHUB_SHA."
+              --notes "Download for Android: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android.apk
+
+Download for macOS: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-macos.dmg
+
+Android install guide: https://github.com/Julian-Bruns/chess/blob/main/docs/android-install.md
+
+Automated Chessfish build from $GITHUB_SHA."
           else
             gh release create latest \
               --title "Latest Chessfish build" \
-              --notes "Automated Chessfish build from $GITHUB_SHA."
+              --notes "Download for Android: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android.apk
+
+Download for macOS: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-macos.dmg
+
+Android install guide: https://github.com/Julian-Bruns/chess/blob/main/docs/android-install.md
+
+Automated Chessfish build from $GITHUB_SHA."
           fi
 
           gh release upload latest release-assets/* --clobber
