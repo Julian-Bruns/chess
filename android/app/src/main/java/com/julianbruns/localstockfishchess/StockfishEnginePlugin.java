@@ -1,7 +1,10 @@
 package com.julianbruns.localstockfishchess;
 
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import androidx.core.content.FileProvider;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -106,6 +109,22 @@ public class StockfishEnginePlugin extends Plugin {
         updateExecutor.submit(() -> {
             try {
                 JSONObject release = fetchJson(APP_RELEASE_API);
+                JSONObject updateManifest = null;
+                try {
+                    updateManifest = fetchUpdateManifest(release.optJSONArray("assets"));
+                } catch (Exception ignored) {
+                    updateManifest = null;
+                }
+
+                if (updateManifest != null && !isNewerAppManifest(updateManifest)) {
+                    JSObject result = new JSObject();
+                    result.put("status", "current");
+                    result.put("releaseTag", release.optString("tag_name", null));
+                    result.put("message", "You are up to date");
+                    call.resolve(result);
+                    return;
+                }
+
                 JSONObject asset = findAndroidApk(release.optJSONArray("assets"));
                 if (asset == null) {
                     JSObject result = new JSObject();
@@ -214,16 +233,102 @@ public class StockfishEnginePlugin extends Plugin {
     }
 
     private JSONObject fetchJson(String url) throws IOException, JSONException {
-        HttpURLConnection connection = openConnection(url, "application/vnd.github+json");
+        return new JSONObject(fetchText(url, "application/vnd.github+json"));
+    }
+
+    private String fetchText(String url, String accept) throws IOException {
+        HttpURLConnection connection = openConnection(url, accept);
         int status = connection.getResponseCode();
         if (status >= 400) {
             throw new IOException("GitHub returned " + status + ". Private release assets require GitHub access outside the app.");
         }
 
         try (InputStream stream = connection.getInputStream()) {
-            return new JSONObject(readUtf8(stream));
+            return readUtf8(stream);
         } finally {
             connection.disconnect();
+        }
+    }
+
+    private JSONObject fetchUpdateManifest(JSONArray assets) throws IOException, JSONException {
+        JSONObject manifest = findUpdateManifest(assets);
+        if (manifest == null) {
+            return null;
+        }
+
+        return new JSONObject(fetchText(manifest.getString("browser_download_url"), "application/octet-stream"));
+    }
+
+    private JSONObject findUpdateManifest(JSONArray assets) throws JSONException {
+        if (assets == null) {
+            return null;
+        }
+
+        for (int index = 0; index < assets.length(); index += 1) {
+            JSONObject asset = assets.getJSONObject(index);
+            if ("update-manifest.json".equals(asset.optString("name", ""))) {
+                return asset;
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isNewerAppManifest(JSONObject latest) {
+        long latestBuild = latest.optLong("buildNumber", -1);
+        if (latestBuild >= 0) {
+            return latestBuild > currentVersionCode();
+        }
+
+        return compareVersions(latest.optString("appVersion", ""), currentVersionName()) > 0;
+    }
+
+    private long currentVersionCode() {
+        try {
+            PackageInfo info = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                return info.getLongVersionCode();
+            }
+
+            return info.versionCode;
+        } catch (PackageManager.NameNotFoundException error) {
+            return 0;
+        }
+    }
+
+    private String currentVersionName() {
+        try {
+            PackageInfo info = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0);
+            return info.versionName == null ? "" : info.versionName;
+        } catch (PackageManager.NameNotFoundException error) {
+            return "";
+        }
+    }
+
+    private int compareVersions(String left, String right) {
+        String[] leftParts = left.split("[.-]");
+        String[] rightParts = right.split("[.-]");
+        int length = Math.max(leftParts.length, rightParts.length);
+
+        for (int index = 0; index < length; index += 1) {
+            int diff = versionPart(leftParts, index) - versionPart(rightParts, index);
+            if (diff != 0) {
+                return diff;
+            }
+        }
+
+        return 0;
+    }
+
+    private int versionPart(String[] parts, int index) {
+        if (index >= parts.length) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(parts[index].replaceAll("[^0-9]", ""));
+        } catch (NumberFormatException error) {
+            return 0;
         }
     }
 

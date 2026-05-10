@@ -231,6 +231,26 @@ async function downloadLatestAppInstaller() {
     };
   }
 
+  let releaseManifest = null;
+  try {
+    releaseManifest = await readReleaseAppManifest(release);
+  } catch {
+    releaseManifest = null;
+  }
+
+  const currentManifest = await readPackagedAppManifest() ?? {
+    appVersion: app.getVersion(),
+    buildNumber: -1
+  };
+
+  if (releaseManifest && !isNewerAppManifest(releaseManifest, currentManifest)) {
+    return {
+      status: 'current',
+      releaseTag: release.tag_name,
+      message: 'You are up to date'
+    };
+  }
+
   const asset = selectMacInstallerAsset(release.assets ?? []);
   if (!asset?.browser_download_url) {
     return {
@@ -283,6 +303,66 @@ function selectMacInstallerAsset(assets) {
 
 function safeFileName(name) {
   return String(name || 'Chessfish.dmg').replace(/[/:\\]/g, '-');
+}
+
+async function readReleaseAppManifest(release) {
+  const asset = (release.assets ?? []).find((item) => item.name === 'update-manifest.json');
+  if (!asset?.browser_download_url) {
+    return null;
+  }
+
+  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'chessfish-app-update-'));
+  try {
+    const manifestPath = path.join(tempDir, 'update-manifest.json');
+    await download(asset.browser_download_url, manifestPath);
+    return JSON.parse(await fsp.readFile(manifestPath, 'utf8'));
+  } finally {
+    await fsp.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function readPackagedAppManifest() {
+  const manifests = [
+    path.join(resourceRoot(), 'dist', 'update-manifest.json'),
+    path.join(resourceRoot(), 'update-manifest.json')
+  ];
+
+  for (const manifestPath of manifests) {
+    try {
+      return JSON.parse(await fsp.readFile(manifestPath, 'utf8'));
+    } catch {
+      // Try the next location.
+    }
+  }
+
+  return null;
+}
+
+function isNewerAppManifest(latest, current) {
+  const latestBuild = Number(latest?.buildNumber);
+  const currentBuild = Number(current?.buildNumber);
+
+  if (Number.isFinite(latestBuild) && Number.isFinite(currentBuild)) {
+    return latestBuild > currentBuild;
+  }
+
+  const versionDiff = compareVersions(String(latest?.appVersion ?? ''), String(current?.appVersion ?? ''));
+  return versionDiff > 0;
+}
+
+function compareVersions(left, right) {
+  const leftParts = left.split(/[.-]/).map((part) => Number(part) || 0);
+  const rightParts = right.split(/[.-]/).map((part) => Number(part) || 0);
+  const length = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const diff = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+
+  return 0;
 }
 
 async function updateStockfish() {

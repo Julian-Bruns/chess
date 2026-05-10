@@ -73,6 +73,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      - name: Add bundled update manifest
+        run: |
+          APP_VERSION="$(node -p "require('./package.json').version")"
+          cat > public/update-manifest.json <<EOF
+          {
+            "appVersion": "$APP_VERSION",
+            "buildNumber": "${{ github.run_number }}",
+            "commit": "${{ github.sha }}",
+            "builtAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }
+          EOF
+
       - name: Run tests
         run: npm test
 
@@ -139,6 +151,18 @@ jobs:
         run: npm run update:stockfish
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Add bundled update manifest
+        run: |
+          APP_VERSION="$(node -p "require('./package.json').version")"
+          cat > public/update-manifest.json <<EOF
+          {
+            "appVersion": "$APP_VERSION",
+            "buildNumber": "${{ github.run_number }}",
+            "commit": "${{ github.sha }}",
+            "builtAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }
+          EOF
 
       - name: Run tests
         run: npm test

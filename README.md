@@ -95,7 +95,7 @@ npm run android:open
 
 ## Automatic Updates
 
-Press the download button in the app toolbar to update everything available for the current platform.
+Open the options menu in the app toolbar and press the install update button to update everything available for the current platform.
 
 On macOS, Chessfish checks the official Stockfish GitHub latest release and refreshes the local engine if needed. It also checks this repository's mutable `latest` GitHub release, downloads the newest macOS DMG into `~/Downloads/Chessfish Updates`, and opens it. Finish the installer window to replace the app.
 
