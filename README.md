@@ -110,6 +110,8 @@ The daily workflow publishes macOS and signed Android assets to the `latest` rel
 
 Without the Android signing secrets, the workflow now fails instead of silently publishing no APK. Debug APKs are not suitable for player updates because debug signing keys are not stable.
 
+See [docs/android-signing.md](docs/android-signing.md) for the exact keystore and GitHub secret setup commands.
+
 The repository must be public for player download links and in-app app updates to work without authentication. Scheduled GitHub Actions work in both private and public repos, but private release assets return 404 to unauthenticated players and installed apps.
 
 ## Public Repository Checklist

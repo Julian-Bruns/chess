@@ -69,6 +69,8 @@ jobs:
 
       - name: Refresh Stockfish binaries
         run: npm run update:stockfish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Run tests
         run: npm test
@@ -90,6 +92,7 @@ jobs:
 
           if [ "$missing" -ne 0 ]; then
             echo "Create one Android release keystore and add these secrets to the repository."
+            echo "See docs/android-signing.md for exact commands."
             exit 1
           fi
 
@@ -133,6 +136,8 @@ jobs:
 
       - name: Refresh Stockfish binaries
         run: npm run update:stockfish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Run tests
         run: npm test

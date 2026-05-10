@@ -10,6 +10,7 @@ const execFileAsync = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const apiUrl = 'https://api.github.com/repos/official-stockfish/Stockfish/releases/latest';
 const userAgent = 'chessfish/0.1.0';
+const githubToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 
 const targets = [
   {
@@ -83,10 +84,9 @@ async function download(url, outPath) {
 
 async function fetchLatestRelease() {
   const response = await fetch(apiUrl, {
-    headers: {
-      'Accept': 'application/vnd.github+json',
-      'User-Agent': userAgent
-    }
+    headers: githubHeaders({
+      'Accept': 'application/vnd.github+json'
+    })
   });
 
   if (!response.ok) {
@@ -94,6 +94,19 @@ async function fetchLatestRelease() {
   }
 
   return response.json();
+}
+
+function githubHeaders(extra = {}) {
+  const headers = {
+    'User-Agent': userAgent,
+    ...extra
+  };
+
+  if (githubToken) {
+    headers.Authorization = `Bearer ${githubToken}`;
+  }
+
+  return headers;
 }
 
 async function walk(dir) {
