@@ -27,6 +27,7 @@ android {
         release {
             if (hasReleaseSigning) {
                 storeFile file(releaseStorePath)
+                storeType System.getenv("CHESSFISH_ANDROID_KEYSTORE_TYPE") ?: "PKCS12"
                 storePassword System.getenv("CHESSFISH_ANDROID_KEYSTORE_PASSWORD")
                 keyAlias System.getenv("CHESSFISH_ANDROID_KEY_ALIAS")
                 keyPassword System.getenv("CHESSFISH_ANDROID_KEY_PASSWORD")
