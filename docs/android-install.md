@@ -10,7 +10,7 @@ https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android
 
 If the browser asks what to do with the file, choose **Download**.
 
-This link starts working after the GitHub workflow has published the first `latest` release. If it shows a GitHub 404 page, the release has not been built yet, the APK was not published, or the repository/release is private.
+This link starts working after the GitHub workflow has published the first `latest` release. If it shows a GitHub 404 page, the release has not been built yet, the APK was not published, or the repository/release is private. Private GitHub release downloads are not visible to players who are not signed in with repository access.
 
 ## Install
 
@@ -28,4 +28,4 @@ Open Chessfish and press the download button in the top bar. Android may ask for
 
 ## If The Link Does Not Work
 
-The direct download only works when the GitHub `latest` release asset is public. If the repository or release assets are private, ask the person sharing Chessfish to send you the APK file directly or publish the latest release assets.
+The direct download only works when the GitHub `latest` release asset is public. If this link shows a GitHub 404 page, make sure the repository is public and the Daily app builds workflow has published the `latest` release.

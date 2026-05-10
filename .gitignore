@@ -4,6 +4,13 @@ release/
 
 .DS_Store
 *.log
+.env
+.env.*
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
 
 android/.gradle/
 android/build/

@@ -73,9 +73,9 @@ To download builds from GitHub:
 1. Open the repository on GitHub.
 2. Go to Actions.
 3. Open the latest Daily app builds run.
-4. Download `chessfish-macos-release-assets` for macOS or `chessfish-android-release-assets` for Android from Artifacts. If Android signing secrets are not configured, download `chessfish-android-debug-apk` for manual testing only.
+4. Download `chessfish-macos-release-assets` for macOS or `chessfish-android-release-assets` for Android from Artifacts.
 
-In a private repository, only people with repository access can run the workflow or download those artifacts.
+For players, prefer the fixed release links at the top of this README. Workflow artifacts are mainly for checking individual CI runs.
 
 ## Run For Development
 
@@ -99,7 +99,7 @@ Press the download button in the app toolbar to update everything available for 
 
 On macOS, Chessfish checks the official Stockfish GitHub latest release and refreshes the local engine if needed. It also checks this repository's mutable `latest` GitHub release, downloads the newest macOS DMG into `~/Downloads/Chessfish Updates`, and opens it. Finish the installer window to replace the app.
 
-On Android, Stockfish is packaged inside the APK because modern Android restricts executing newly downloaded files from writable app storage. Pressing the update button downloads the newest signed Android APK from the `latest` GitHub release and opens Android's installer. Android may still ask for install permission or final confirmation; that is enforced by the OS.
+On Android, Stockfish is packaged inside the APK because modern Android restricts executing newly downloaded files from writable app storage. Pressing the update button downloads the newest signed Android APK from this repository's `latest` GitHub release and opens Android's installer. Android may still ask for install permission or final confirmation; that is enforced by the OS.
 
 The daily workflow publishes macOS and signed Android assets to the `latest` release. For Android one-press updates to work across daily builds, configure these repository secrets so every APK uses the same release key:
 
@@ -108,9 +108,17 @@ The daily workflow publishes macOS and signed Android assets to the `latest` rel
 - `CHESSFISH_ANDROID_KEY_ALIAS`
 - `CHESSFISH_ANDROID_KEY_PASSWORD`
 
-Without those secrets, the workflow still builds a debug APK artifact, but it is not published as an in-app update because debug signing keys are not stable for real updates.
+Without the Android signing secrets, the workflow now fails instead of silently publishing no APK. Debug APKs are not suitable for player updates because debug signing keys are not stable.
 
-You do not need to make the GitHub repository public for scheduled GitHub Actions. A private repo works if Actions are enabled and the account has enough Actions minutes/storage. However, installed apps cannot download private GitHub release assets unless the user authenticates or a token is embedded, which this app intentionally does not do. For one-press in-app updates, publish the `latest` release assets publicly or host them at a public update URL.
+The repository must be public for player download links and in-app app updates to work without authentication. Scheduled GitHub Actions work in both private and public repos, but private release assets return 404 to unauthenticated players and installed apps.
+
+## Public Repository Checklist
+
+1. Confirm no keystores, `.env` files, tokens, or generated release artifacts are tracked by Git.
+2. Configure the Android signing secrets listed above in GitHub repository secrets.
+3. Make the repository public in GitHub settings.
+4. Run the Daily app builds workflow.
+5. Confirm the `latest` release contains `chessfish-android.apk` and `chessfish-macos.dmg`.
 
 ## Engine Timing
 

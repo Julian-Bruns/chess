@@ -73,47 +73,45 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Validate Android release signing
+        run: |
+          missing=0
+          for name in \
+            CHESSFISH_ANDROID_KEYSTORE_BASE64 \
+            CHESSFISH_ANDROID_KEYSTORE_PASSWORD \
+            CHESSFISH_ANDROID_KEY_ALIAS \
+            CHESSFISH_ANDROID_KEY_PASSWORD
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required to publish a player-installable Android APK."
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            echo "Create one Android release keystore and add these secrets to the repository."
+            exit 1
+          fi
+
       - name: Prepare Android release keystore
-        if: ${{ env.CHESSFISH_ANDROID_KEYSTORE_BASE64 != '' && env.CHESSFISH_ANDROID_KEYSTORE_PASSWORD != '' && env.CHESSFISH_ANDROID_KEY_ALIAS != '' && env.CHESSFISH_ANDROID_KEY_PASSWORD != '' }}
         run: |
           echo "$CHESSFISH_ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/chessfish-release.jks
 
       - name: Build signed Android release APK
-        if: ${{ env.CHESSFISH_ANDROID_KEYSTORE_BASE64 != '' && env.CHESSFISH_ANDROID_KEYSTORE_PASSWORD != '' && env.CHESSFISH_ANDROID_KEY_ALIAS != '' && env.CHESSFISH_ANDROID_KEY_PASSWORD != '' }}
         run: npm run android:release:apk
         env:
           CHESSFISH_ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android/app/chessfish-release.jks
 
-      - name: Build Android debug APK
-        if: ${{ env.CHESSFISH_ANDROID_KEYSTORE_BASE64 == '' || env.CHESSFISH_ANDROID_KEYSTORE_PASSWORD == '' || env.CHESSFISH_ANDROID_KEY_ALIAS == '' || env.CHESSFISH_ANDROID_KEY_PASSWORD == '' }}
-        run: npm run android:debug
-
       - name: Collect signed Android APK
-        if: ${{ env.CHESSFISH_ANDROID_KEYSTORE_BASE64 != '' && env.CHESSFISH_ANDROID_KEYSTORE_PASSWORD != '' && env.CHESSFISH_ANDROID_KEY_ALIAS != '' && env.CHESSFISH_ANDROID_KEY_PASSWORD != '' }}
         run: |
           mkdir -p artifacts
           cp android/app/build/outputs/apk/release/app-release.apk artifacts/chessfish-android.apk
 
-      - name: Collect debug Android APK
-        if: ${{ env.CHESSFISH_ANDROID_KEYSTORE_BASE64 == '' || env.CHESSFISH_ANDROID_KEYSTORE_PASSWORD == '' || env.CHESSFISH_ANDROID_KEY_ALIAS == '' || env.CHESSFISH_ANDROID_KEY_PASSWORD == '' }}
-        run: |
-          mkdir -p debug-artifacts
-          cp android/app/build/outputs/apk/debug/app-debug.apk debug-artifacts/chessfish-android-debug.apk
-
       - name: Upload signed Android APK
-        if: ${{ env.CHESSFISH_ANDROID_KEYSTORE_BASE64 != '' && env.CHESSFISH_ANDROID_KEYSTORE_PASSWORD != '' && env.CHESSFISH_ANDROID_KEY_ALIAS != '' && env.CHESSFISH_ANDROID_KEY_PASSWORD != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: chessfish-android-release-assets
           path: artifacts/*.apk
-          retention-days: 14
-
-      - name: Upload debug Android APK
-        if: ${{ env.CHESSFISH_ANDROID_KEYSTORE_BASE64 == '' || env.CHESSFISH_ANDROID_KEYSTORE_PASSWORD == '' || env.CHESSFISH_ANDROID_KEY_ALIAS == '' || env.CHESSFISH_ANDROID_KEY_PASSWORD == '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: chessfish-android-debug-apk
-          path: debug-artifacts/*.apk
           retention-days: 14
 
   macos:
@@ -192,29 +190,31 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          DOWNLOAD_BASE="https://github.com/$GITHUB_REPOSITORY/releases/download/latest"
           cat > release-notes.md <<EOF
-          Download for Android: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android.apk
+          Download for Android: $DOWNLOAD_BASE/chessfish-android.apk
 
-          Download for macOS: https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-macos.dmg
+          Download for macOS: $DOWNLOAD_BASE/chessfish-macos.dmg
 
-          Android install guide: https://github.com/Julian-Bruns/chess/blob/main/docs/android-install.md
+          Android install:
+          1. Open the APK on the Android phone.
+          2. If Android asks, allow installs from the browser or file manager.
+          3. Tap Install, then open Chessfish.
 
           Automated Chessfish build from $GITHUB_SHA.
           EOF
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f latest "$GITHUB_SHA"
-          git push --force origin refs/tags/latest
 
           if gh release view latest >/dev/null 2>&1; then
             gh release edit latest \
               --title "Latest Chessfish build" \
               --notes-file release-notes.md
+            gh release upload latest release-assets/* --clobber
           else
             gh release create latest \
               --title "Latest Chessfish build" \
-              --notes-file release-notes.md
+              --notes-file release-notes.md \
+              release-assets/*
           fi
 
-          gh release upload latest release-assets/* --clobber
+          echo "Published release:"
+          gh release view latest --json url --jq .url
