@@ -1,0 +1,51 @@
+{
+  "releaseTag": "sf_18",
+  "releaseName": "Stockfish 18",
+  "releaseUrl": "https://github.com/official-stockfish/Stockfish/releases/tag/sf_18",
+  "updatedAt": "2026-05-10T10:56:21.499Z",
+  "previousReleaseTag": null,
+  "binaries": {
+    "macos-arm64": {
+      "asset": "stockfish-macos-m1-apple-silicon.tar",
+      "path": "engines/macos/arm64/stockfish",
+      "size": 115322880,
+      "downloadUrl": "https://github.com/official-stockfish/Stockfish/releases/download/sf_18/stockfish-macos-m1-apple-silicon.tar"
+    },
+    "macos-x64-bmi2": {
+      "asset": "stockfish-macos-x86-64-bmi2.tar",
+      "path": "engines/macos/x64/stockfish-bmi2",
+      "size": 114472960,
+      "downloadUrl": "https://github.com/official-stockfish/Stockfish/releases/download/sf_18/stockfish-macos-x86-64-bmi2.tar"
+    },
+    "macos-x64-avx2": {
+      "asset": "stockfish-macos-x86-64-avx2.tar",
+      "path": "engines/macos/x64/stockfish-avx2",
+      "size": 114472960,
+      "downloadUrl": "https://github.com/official-stockfish/Stockfish/releases/download/sf_18/stockfish-macos-x86-64-avx2.tar"
+    },
+    "macos-x64-popcnt": {
+      "asset": "stockfish-macos-x86-64-sse41-popcnt.tar",
+      "path": "engines/macos/x64/stockfish-popcnt",
+      "size": 114472960,
+      "downloadUrl": "https://github.com/official-stockfish/Stockfish/releases/download/sf_18/stockfish-macos-x86-64-sse41-popcnt.tar"
+    },
+    "macos-x64": {
+      "asset": "stockfish-macos-x86-64.tar",
+      "path": "engines/macos/x64/stockfish",
+      "size": 114452480,
+      "downloadUrl": "https://github.com/official-stockfish/Stockfish/releases/download/sf_18/stockfish-macos-x86-64.tar"
+    },
+    "android-arm64-v8a": {
+      "asset": "stockfish-android-armv8.tar",
+      "path": "android/app/src/main/jniLibs/arm64-v8a/libstockfish.so",
+      "size": 115578880,
+      "downloadUrl": "https://github.com/official-stockfish/Stockfish/releases/download/sf_18/stockfish-android-armv8.tar"
+    },
+    "android-armeabi-v7a": {
+      "asset": "stockfish-android-armv7-neon.tar",
+      "path": "android/app/src/main/jniLibs/armeabi-v7a/libstockfish.so",
+      "size": 115036160,
+      "downloadUrl": "https://github.com/official-stockfish/Stockfish/releases/download/sf_18/stockfish-android-armv7-neon.tar"
+    }
+  }
+}

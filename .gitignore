@@ -1,0 +1,13 @@
+node_modules/
+dist/
+
+.DS_Store
+*.log
+
+android/.gradle/
+android/build/
+android/app/build/
+android/app/src/main/assets/public/
+android/app/src/main/jniLibs/
+
+engines/

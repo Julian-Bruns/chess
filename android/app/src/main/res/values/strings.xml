@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Local Stockfish Chess</string>
+    <string name="title_activity_main">Local Stockfish Chess</string>
+    <string name="package_name">com.julianbruns.localstockfishchess</string>
+    <string name="custom_url_scheme">com.julianbruns.localstockfishchess</string>
+</resources>
