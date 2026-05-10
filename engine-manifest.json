@@ -2,8 +2,8 @@
   "releaseTag": "sf_18",
   "releaseName": "Stockfish 18",
   "releaseUrl": "https://github.com/official-stockfish/Stockfish/releases/tag/sf_18",
-  "updatedAt": "2026-05-10T10:56:21.499Z",
-  "previousReleaseTag": null,
+  "updatedAt": "2026-05-10T13:54:00.452Z",
+  "previousReleaseTag": "sf_18",
   "binaries": {
     "macos-arm64": {
       "asset": "stockfish-macos-m1-apple-silicon.tar",

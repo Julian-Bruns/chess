@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const { execFile, execFileSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
@@ -17,7 +17,7 @@ let engineBuffer = '';
 let updatePromise = null;
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  const window = new BrowserWindow({
     width: 860,
     height: 920,
     minWidth: 360,
@@ -33,12 +33,72 @@ function createWindow() {
     }
   });
 
-  mainWindow.setMenuBarVisibility(false);
-  mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  mainWindow = window;
+  window.setMenuBarVisibility(false);
+  window.on('closed', () => {
+    if (mainWindow === window) {
+      mainWindow = null;
+    }
+  });
+  window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+}
+
+function createApplicationMenu() {
+  if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(null);
+    return;
+  }
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {
+      label: appName,
+      submenu: [
+        { role: 'about', label: `About ${appName}` },
+        { type: 'separator' },
+        { role: 'hide', label: `Hide ${appName}` },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit', label: `Quit ${appName}` }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'close' }
+      ]
+    }
+  ]));
 }
 
 app.setName(appName);
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createApplicationMenu();
+  createWindow();
+});
+
+app.on('before-quit', () => {
+  stopEngine();
+});
 
 app.on('window-all-closed', () => {
   stopEngine();
@@ -126,15 +186,23 @@ function emitEngineLines(chunk) {
 
   for (const line of lines) {
     if (line.trim()) {
-      mainWindow?.webContents.send('stockfish:line', line.trim());
+      sendToWindow('stockfish:line', line.trim());
     }
   }
 }
 
 function sendStatus(status) {
   if (status) {
-    mainWindow?.webContents.send('stockfish:status', status);
+    sendToWindow('stockfish:status', status);
   }
+}
+
+function sendToWindow(channel, ...args) {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.send(channel, ...args);
 }
 
 async function checkForUpdate() {

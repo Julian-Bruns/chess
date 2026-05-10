@@ -13,6 +13,7 @@ export class UciEngine {
   private initialized = false;
   private disposers: Array<() => void> = [];
   private lastInfo: SearchInfo = {};
+  private searchQueue: Promise<unknown> = Promise.resolve();
 
   constructor(
     private readonly transport: EngineTransport,
@@ -49,12 +50,31 @@ export class UciEngine {
 
   async newGame() {
     await this.start();
+    await this.waitForIdleSearch();
     this.send('ucinewgame');
     this.send('isready');
     await this.waitFor((line) => line === 'readyok', 10_000);
   }
 
   async bestMove(fen: string, movetimeMs: number) {
+    const search = this.searchQueue.catch(() => undefined).then(() => this.runBestMove(fen, movetimeMs));
+    this.searchQueue = search.catch(() => undefined);
+    return search;
+  }
+
+  stopSearch() {
+    this.send('stop');
+  }
+
+  dispose() {
+    for (const dispose of this.disposers) {
+      dispose();
+    }
+    this.disposers = [];
+    this.transport.stop();
+  }
+
+  private async runBestMove(fen: string, movetimeMs: number) {
     await this.start();
     this.lastInfo = {};
     this.onStatus('thinking');
@@ -74,16 +94,8 @@ export class UciEngine {
     return move;
   }
 
-  stopSearch() {
-    this.send('stop');
-  }
-
-  dispose() {
-    for (const dispose of this.disposers) {
-      dispose();
-    }
-    this.disposers = [];
-    this.transport.stop();
+  private waitForIdleSearch() {
+    return this.searchQueue.catch(() => undefined);
   }
 
   private send(command: string) {

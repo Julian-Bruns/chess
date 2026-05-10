@@ -34,6 +34,10 @@ type SearchEvaluation = {
   score: string;
 };
 
+type SearchContext = SearchEvaluation & {
+  mode: 'move' | 'evaluation';
+};
+
 type PromotionRequest = {
   from: Square;
   to: Square;
@@ -44,6 +48,7 @@ type PromotionRequest = {
 const startFen = new Chess().fen();
 const promotionOrder: Array<'q' | 'r' | 'b' | 'n'> = ['q', 'r', 'b', 'n'];
 const assetBase = import.meta.env.BASE_URL;
+const evaluationMoveTimeMs = 350;
 
 function createInitialGameState(): GameState {
   return {
@@ -61,7 +66,7 @@ export default function App() {
   const [engineStatus, setEngineStatus] = useState<EngineStatus>('idle');
   const [engineText, setEngineText] = useState('Stockfish');
   const [engineInfo, setEngineInfo] = useState<SearchInfo>({});
-  const [evaluation, setEvaluation] = useState<SearchEvaluation | null>(null);
+  const [evaluations, setEvaluations] = useState<Record<string, SearchEvaluation>>({});
   const [thinking, setThinking] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateNotice, setUpdateNotice] = useState<string | null>(null);
@@ -73,13 +78,13 @@ export default function App() {
   const fen = activeEntry.fen;
   const game = useMemo(() => new Chess(fen), [fen]);
   const lastMove = activeEntry.move ? { from: activeEntry.move.from, to: activeEntry.move.to } : null;
-  const activeEvaluation = evaluation?.fen === fen ? evaluation : null;
+  const activeEvaluation = evaluations[fen] ?? null;
   const atFirstMove = gameState.index === 0;
   const atLatestMove = gameState.index >= gameState.entries.length - 1;
   const engineRef = useRef<UciEngine | null>(null);
   const moveTimeRef = useRef(moveTimeMs);
   const searchSerial = useRef(0);
-  const currentSearchRef = useRef<{ fen: string; turn: Color } | null>(null);
+  const currentSearchRef = useRef<SearchContext | null>(null);
 
   useEffect(() => {
     moveTimeRef.current = moveTimeMs;
@@ -109,9 +114,21 @@ export default function App() {
 
         const search = currentSearchRef.current;
         if (search && info.score) {
-          setEvaluation({
-            ...search,
+          const evaluation = {
+            fen: search.fen,
+            turn: search.turn,
             score: info.score
+          };
+          setEvaluations((current) => {
+            const existing = current[search.fen];
+            if (existing?.score === evaluation.score && existing.turn === evaluation.turn) {
+              return current;
+            }
+
+            return {
+              ...current,
+              [search.fen]: evaluation
+            };
           });
         }
       },
@@ -140,6 +157,70 @@ export default function App() {
     setLegalMoves([]);
   }, []);
 
+  const requestPositionEvaluation = useCallback(async (positionFen: string) => {
+    if (!showEvalBar) {
+      return;
+    }
+
+    const engine = engineRef.current;
+    if (!engine) {
+      return;
+    }
+
+    const position = new Chess(positionFen);
+    if (position.isGameOver()) {
+      return;
+    }
+
+    const serial = searchSerial.current + 1;
+    searchSerial.current = serial;
+    currentSearchRef.current = {
+      fen: positionFen,
+      turn: position.turn(),
+      score: '',
+      mode: 'evaluation'
+    };
+    setEngineInfo({});
+
+    try {
+      await engine.bestMove(positionFen, evaluationMoveTimeMs);
+      if (searchSerial.current === serial) {
+        setEngineStatus('ready');
+        setEngineText('ready');
+      }
+    } catch (error) {
+      if (searchSerial.current === serial) {
+        setEngineStatus('error');
+        setEngineText(error instanceof Error ? error.message : 'Stockfish evaluation failed');
+      }
+    } finally {
+      if (searchSerial.current === serial) {
+        currentSearchRef.current = null;
+      }
+    }
+  }, [showEvalBar]);
+
+  useEffect(() => {
+    if (!showEvalBar && currentSearchRef.current?.mode === 'evaluation') {
+      searchSerial.current += 1;
+      engineRef.current?.stopSearch();
+      currentSearchRef.current = null;
+      setEngineInfo({});
+    }
+  }, [showEvalBar]);
+
+  useEffect(() => {
+    if (!showEvalBar || thinking || engineStatus !== 'ready' || activeEvaluation || game.isGameOver() || game.turn() !== 'w') {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void requestPositionEvaluation(fen);
+    }, 120);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeEvaluation, engineStatus, fen, game, requestPositionEvaluation, showEvalBar, thinking]);
+
   const requestEngineMove = useCallback(async (positionFen: string) => {
     const engine = engineRef.current;
     if (!engine) {
@@ -152,11 +233,12 @@ export default function App() {
     searchSerial.current = serial;
     currentSearchRef.current = {
       fen: positionFen,
-      turn: new Chess(positionFen).turn()
+      turn: new Chess(positionFen).turn(),
+      score: '',
+      mode: 'move'
     };
     setThinking(true);
     setEngineInfo({});
-    setEvaluation(null);
 
     try {
       const bestMove = await engine.bestMove(positionFen, moveTimeRef.current);
@@ -165,6 +247,7 @@ export default function App() {
       }
 
       const applied = applyUciMove(positionFen, bestMove);
+      const nextGame = new Chess(applied.fen);
       const moveEntry = toHistoryMove(applied.move);
       setGameState((current) => {
         const latestIndex = current.entries.length - 1;
@@ -189,6 +272,12 @@ export default function App() {
       });
       setEngineStatus('ready');
       setEngineText('ready');
+      setThinking(false);
+      currentSearchRef.current = null;
+
+      if (!nextGame.isGameOver()) {
+        void requestPositionEvaluation(applied.fen);
+      }
     } catch (error) {
       if (searchSerial.current === serial) {
         setEngineStatus('error');
@@ -200,7 +289,7 @@ export default function App() {
         currentSearchRef.current = null;
       }
     }
-  }, []);
+  }, [requestPositionEvaluation]);
 
   const commitUserMove = useCallback((move: BoardMove) => {
     searchSerial.current += 1;
@@ -229,7 +318,6 @@ export default function App() {
     });
     setPromotion(null);
     setEngineInfo({});
-    setEvaluation(null);
     clearSelection();
 
     if (!nextGame.isGameOver()) {
@@ -289,7 +377,7 @@ export default function App() {
     setGameState(createInitialGameState());
     setPromotion(null);
     setEngineInfo({});
-    setEvaluation(null);
+    setEvaluations({});
     setThinking(false);
     clearSelection();
   }, [clearSelection]);
@@ -301,7 +389,6 @@ export default function App() {
     setThinking(false);
     setPromotion(null);
     setEngineInfo({});
-    setEvaluation(null);
     clearSelection();
 
     setGameState((current) => {

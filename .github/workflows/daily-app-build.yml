@@ -133,6 +133,12 @@ jobs:
   macos:
     name: macOS DMG
     runs-on: macos-latest
+    env:
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
     steps:
       - name: Check out repository
@@ -167,17 +173,49 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Validate macOS signing
+        run: |
+          missing=0
+          for name in CSC_LINK CSC_KEY_PASSWORD
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required to publish a macOS app users can open without Terminal."
+              missing=1
+            fi
+          done
+
+          for name in APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required to notarize the macOS app."
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            echo "Add a Developer ID Application certificate as CSC_LINK/CSC_KEY_PASSWORD and Apple notarization credentials before publishing macOS builds."
+            exit 1
+          fi
+
       - name: Build macOS DMG
-        run: npm run electron:pack
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build && npx electron-builder --mac dmg --publish never --config.mac.forceCodeSigning=true
+
+      - name: Verify macOS app
+        run: |
+          APP_PATH="$(find release -name 'Chessfish.app' -type d | head -n 1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::Packaged Chessfish.app was not found."
+            exit 1
+          fi
+
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+          spctl --assess --type execute --verbose=4 "$APP_PATH"
 
       - name: Collect macOS DMG
         run: |
           mkdir -p artifacts
-          for dmg in release/*.dmg; do
-            cp "$dmg" "artifacts/chessfish-macos.dmg"
-          done
+          cp release/chessfish-macos.dmg artifacts/chessfish-macos.dmg
 
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
@@ -222,16 +260,11 @@ jobs:
         run: |
           DOWNLOAD_BASE="https://github.com/$GITHUB_REPOSITORY/releases/download/latest"
           cat > release-notes.md <<EOF
-          Download for Android: $DOWNLOAD_BASE/chessfish-android.apk
+          Chessfish is a local Stockfish chess app.
 
-          Download for macOS: $DOWNLOAD_BASE/chessfish-macos.dmg
+          macOS: Download $DOWNLOAD_BASE/chessfish-macos.dmg, open it, and drag Chessfish to Applications.
 
-          Android install:
-          1. Open the APK on the Android phone.
-          2. If Android asks, allow installs from the browser or file manager.
-          3. Tap Install, then open Chessfish.
-
-          Automated Chessfish build from $GITHUB_SHA.
+          Android: Download $DOWNLOAD_BASE/chessfish-android.apk, open it, and tap Install.
           EOF
 
           if gh release view latest >/dev/null 2>&1; then

@@ -61,6 +61,7 @@
   "build": {
     "appId": "com.julianbruns.localstockfishchess",
     "productName": "Chessfish",
+    "executableName": "Chessfish",
     "directories": {
       "output": "release"
     },
@@ -83,8 +84,42 @@
     "mac": {
       "category": "public.app-category.games",
       "icon": "build/icon.icns",
+      "artifactName": "chessfish-macos.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "binaries": [
+        "Contents/Resources/engines/macos/arm64/stockfish",
+        "Contents/Resources/engines/macos/x64/stockfish",
+        "Contents/Resources/engines/macos/x64/stockfish-avx2",
+        "Contents/Resources/engines/macos/x64/stockfish-bmi2",
+        "Contents/Resources/engines/macos/x64/stockfish-popcnt"
+      ],
+      "extendInfo": {
+        "CFBundleName": "Chessfish",
+        "CFBundleDisplayName": "Chessfish",
+        "LSApplicationCategoryType": "public.app-category.games",
+        "NSHighResolutionCapable": true
+      },
       "target": [
         "dmg"
+      ]
+    },
+    "dmg": {
+      "title": "Chessfish",
+      "icon": "build/icon.icns",
+      "contents": [
+        {
+          "x": 150,
+          "y": 170
+        },
+        {
+          "x": 390,
+          "y": 170,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     }
   }
