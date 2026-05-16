@@ -109,6 +109,7 @@
     "dmg": {
       "title": "Chessfish",
       "icon": "build/icon.icns",
+      "sign": true,
       "contents": [
         {
           "x": 150,

@@ -13,9 +13,11 @@ Chessfish is a simple chess app for playing White against local Stockfish.
 
 ### macOS
 
-Download the latest DMG, open it, and drag Chessfish into Applications:
+Download the latest signed and notarized DMG, open it, and drag Chessfish into Applications:
 
 https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-macos.dmg
+
+Release signing setup is documented in [docs/macos-signing.md](docs/macos-signing.md).
 
 ### Windows
 
