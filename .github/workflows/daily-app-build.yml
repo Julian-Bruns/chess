@@ -211,34 +211,46 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Validate macOS signing
+      - name: Resolve macOS signing mode
+        id: macos-signing
         run: |
           missing=0
-          for name in CSC_LINK CSC_KEY_PASSWORD
+          for name in \
+            CSC_LINK \
+            CSC_KEY_PASSWORD \
+            APPLE_ID \
+            APPLE_APP_SPECIFIC_PASSWORD \
+            APPLE_TEAM_ID
           do
             if [ -z "${!name}" ]; then
-              echo "::error::$name is required to publish a macOS app users can open without Terminal."
-              missing=1
-            fi
-          done
-
-          for name in APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
-          do
-            if [ -z "${!name}" ]; then
-              echo "::error::$name is required to notarize the macOS app."
+              echo "::notice::$name is not configured."
               missing=1
             fi
           done
 
           if [ "$missing" -ne 0 ]; then
-            echo "Add a Developer ID Application certificate as CSC_LINK/CSC_KEY_PASSWORD and Apple notarization credentials before publishing macOS builds."
-            exit 1
+            echo "::warning::macOS signing/notarization credentials are incomplete; building an unsigned daily DMG."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build macOS DMG
-        run: npm run build && npx electron-builder --mac dmg --publish never --config.mac.forceCodeSigning=true
+        env:
+          SIGN_MACOS: ${{ steps.macos-signing.outputs.enabled }}
+        run: |
+          npm run build
 
-      - name: Verify macOS app
+          if [ "$SIGN_MACOS" = "true" ]; then
+            npx electron-builder --mac dmg --publish never --config.mac.forceCodeSigning=true
+          else
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+            npx electron-builder --mac dmg --publish never
+          fi
+
+      - name: Verify signed macOS app
+        if: steps.macos-signing.outputs.enabled == 'true'
         run: |
           APP_PATH="$(find release -name 'Chessfish.app' -type d | head -n 1)"
           if [ -z "$APP_PATH" ]; then
@@ -249,6 +261,22 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           xcrun stapler validate "$APP_PATH"
           spctl --assess --type execute --verbose=4 "$APP_PATH"
+
+      - name: Verify unsigned macOS app
+        if: steps.macos-signing.outputs.enabled != 'true'
+        run: |
+          APP_PATH="$(find release -name 'Chessfish.app' -type d | head -n 1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::Packaged Chessfish.app was not found."
+            exit 1
+          fi
+
+          if [ ! -f release/chessfish-macos.dmg ]; then
+            echo "::error::Packaged chessfish-macos.dmg was not found."
+            exit 1
+          fi
+
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
       - name: Collect macOS DMG
         run: |
