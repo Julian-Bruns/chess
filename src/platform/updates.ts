@@ -37,6 +37,6 @@ export async function updateEverything(): Promise<UpdateResult> {
 
   return {
     status: 'unavailable',
-    message: 'Updates are available in the macOS and Android apps.'
+    message: 'Updates are available in the macOS, Windows, iOS, and Android apps.'
   };
 }

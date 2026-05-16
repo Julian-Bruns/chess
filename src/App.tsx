@@ -1,11 +1,40 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Chess, type Color, type Move, type PieceSymbol, type Square } from 'chess.js';
-import { ChartNoAxesColumn, ChevronLeft, ChevronRight, Download, EllipsisVertical, RotateCcw, Timer } from 'lucide-react';
+import {
+  Brain,
+  ChartNoAxesColumn,
+  ChevronLeft,
+  ChevronRight,
+  CircleCheck,
+  CircleX,
+  Download,
+  EllipsisVertical,
+  Play,
+  Puzzle,
+  RotateCcw,
+  Target,
+  Timer,
+  Trophy,
+  X
+} from 'lucide-react';
 import { applyMove, applyUciMove, legalMovesFor, promotionChoicesFor, squareName, type BoardMove } from './chess/chessRules';
 import { createEngineTransport } from './engine/transport';
 import { UciEngine } from './engine/uci';
 import type { EngineStatus, SearchInfo } from './engine/types';
 import { updateEverything, type UpdateResult } from './platform/updates';
+import {
+  createPuzzleTrainerState,
+  formatPuzzleThemes,
+  moveToUci,
+  normalizePuzzleRating,
+  preparePuzzle,
+  recordPuzzleAttempt,
+  recordPuzzleServed,
+  selectNextPuzzle,
+  uciToSan,
+  type PreparedPuzzle,
+  type PuzzleTrainerState
+} from './puzzles/trainer';
 
 type LastMove = {
   from: Square;
@@ -45,6 +74,14 @@ type PromotionRequest = {
   color: Color;
 };
 
+type AppMode = 'game' | 'puzzle';
+
+type PuzzleFeedback = {
+  kind: 'progress' | 'solved' | 'missed';
+  message: string;
+  complete: boolean;
+};
+
 const startFen = new Chess().fen();
 const promotionOrder: Array<'q' | 'r' | 'b' | 'n'> = ['q', 'r', 'b', 'n'];
 const assetBase = import.meta.env.BASE_URL;
@@ -58,11 +95,17 @@ function createInitialGameState(): GameState {
 }
 
 export default function App() {
+  const [mode, setMode] = useState<AppMode>('game');
   const [gameState, setGameState] = useState<GameState>(() => createInitialGameState());
   const [selected, setSelected] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<Move[]>([]);
   const [promotion, setPromotion] = useState<PromotionRequest | null>(null);
   const [moveTimeMs, setMoveTimeMs] = useState(1000);
+  const [startingPuzzleElo, setStartingPuzzleElo] = useState(1200);
+  const [puzzleTrainer, setPuzzleTrainer] = useState<PuzzleTrainerState>(() => createPuzzleTrainerState(1200));
+  const [activePuzzle, setActivePuzzle] = useState<PreparedPuzzle | null>(null);
+  const [puzzleMoveIndex, setPuzzleMoveIndex] = useState(0);
+  const [puzzleFeedback, setPuzzleFeedback] = useState<PuzzleFeedback | null>(null);
   const [engineStatus, setEngineStatus] = useState<EngineStatus>('idle');
   const [engineText, setEngineText] = useState('Stockfish');
   const [engineInfo, setEngineInfo] = useState<SearchInfo>({});
@@ -82,6 +125,8 @@ export default function App() {
   const activeEvaluation = evaluations[fen] ?? null;
   const atFirstMove = gameState.index === 0;
   const atLatestMove = gameState.index >= gameState.entries.length - 1;
+  const showActiveEvalBar = mode === 'game' && showEvalBar;
+  const puzzleCanMove = mode === 'puzzle' && !!activePuzzle && !puzzleFeedback?.complete && atLatestMove;
   const engineRef = useRef<UciEngine | null>(null);
   const moveTimeRef = useRef(moveTimeMs);
   const searchSerial = useRef(0);
@@ -215,6 +260,7 @@ export default function App() {
 
   useEffect(() => {
     if (
+      mode !== 'game' ||
       !showEvalBar ||
       thinking ||
       analyzing ||
@@ -232,7 +278,7 @@ export default function App() {
     }, 120);
 
     return () => window.clearTimeout(timeout);
-  }, [activeEvaluation, analyzing, engineStatus, fen, game, gameState.index, requestPositionEvaluation, showEvalBar, thinking]);
+  }, [activeEvaluation, analyzing, engineStatus, fen, game, gameState.index, mode, requestPositionEvaluation, showEvalBar, thinking]);
 
   const requestEngineMove = useCallback(async (positionFen: string) => {
     const engine = engineRef.current;
@@ -299,7 +345,130 @@ export default function App() {
     }
   }, []);
 
+  const beginPuzzle = useCallback((trainerState: PuzzleTrainerState) => {
+    const puzzle = selectNextPuzzle(trainerState);
+    const prepared = preparePuzzle(puzzle);
+    const lead = applyUciMove(puzzle.sourceFen, puzzle.moves[0]);
+
+    setPuzzleTrainer(recordPuzzleServed(trainerState, puzzle));
+    setActivePuzzle(prepared);
+    setPuzzleMoveIndex(0);
+    setPuzzleFeedback(null);
+    setGameState({
+      entries: [
+        { fen: puzzle.sourceFen },
+        {
+          fen: prepared.startFen,
+          move: toHistoryMove(lead.move)
+        }
+      ],
+      index: 1
+    });
+    setPromotion(null);
+    setEngineInfo({});
+    setEvaluations({});
+    clearSelection();
+  }, [clearSelection]);
+
+  const startPuzzleMode = useCallback(() => {
+    searchSerial.current += 1;
+    engineRef.current?.stopSearch();
+    currentSearchRef.current = null;
+    setThinking(false);
+    setAnalyzing(false);
+    setMode('puzzle');
+    setOptionsOpen(false);
+    beginPuzzle(createPuzzleTrainerState(startingPuzzleElo));
+  }, [beginPuzzle, startingPuzzleElo]);
+
+  const goToNextPuzzle = useCallback(() => {
+    beginPuzzle(puzzleTrainer);
+  }, [beginPuzzle, puzzleTrainer]);
+
+  const finishPuzzleAttempt = useCallback((solved: boolean, message: string) => {
+    if (!activePuzzle) {
+      return;
+    }
+
+    setPuzzleTrainer((current) => recordPuzzleAttempt(current, activePuzzle.puzzle, solved));
+    setPuzzleFeedback({
+      kind: solved ? 'solved' : 'missed',
+      message,
+      complete: true
+    });
+  }, [activePuzzle]);
+
+  const commitPuzzleMove = useCallback((move: BoardMove) => {
+    if (!activePuzzle || puzzleFeedback?.complete) {
+      return;
+    }
+
+    const expectedMove = activePuzzle.solutionMoves[puzzleMoveIndex];
+    if (!expectedMove) {
+      return;
+    }
+
+    if (moveToUci(move) !== expectedMove) {
+      finishPuzzleAttempt(false, `Missed: ${uciToSan(fen, expectedMove)}`);
+      setPromotion(null);
+      clearSelection();
+      return;
+    }
+
+    const applied = applyMove(fen, move);
+    const entries: HistoryEntry[] = [
+      {
+        fen: applied.fen,
+        move: toHistoryMove(applied.move)
+      }
+    ];
+    let nextFen = applied.fen;
+    let nextMoveIndex = puzzleMoveIndex + 1;
+
+    if (nextMoveIndex < activePuzzle.solutionMoves.length) {
+      const reply = applyUciMove(nextFen, activePuzzle.solutionMoves[nextMoveIndex]);
+      nextFen = reply.fen;
+      entries.push({
+        fen: nextFen,
+        move: toHistoryMove(reply.move)
+      });
+      nextMoveIndex += 1;
+    }
+
+    setGameState((current) => {
+      if (current.entries[current.index]?.fen !== fen) {
+        return current;
+      }
+
+      const nextEntries = current.entries.slice(0, current.index + 1);
+      nextEntries.push(...entries);
+
+      return {
+        entries: nextEntries,
+        index: nextEntries.length - 1
+      };
+    });
+    setPuzzleMoveIndex(nextMoveIndex);
+    setPromotion(null);
+    clearSelection();
+
+    if (nextMoveIndex >= activePuzzle.solutionMoves.length) {
+      finishPuzzleAttempt(true, `Solved: ${applied.move.san}`);
+    } else {
+      setPuzzleFeedback({
+        kind: 'progress',
+        message: `Correct: ${applied.move.san}`,
+        complete: false
+      });
+    }
+  }, [activePuzzle, clearSelection, fen, finishPuzzleAttempt, puzzleFeedback?.complete, puzzleMoveIndex]);
+
   const commitUserMove = useCallback((move: BoardMove) => {
+    if (mode === 'puzzle') {
+      commitPuzzleMove(move);
+      return;
+    }
+
     searchSerial.current += 1;
     engineRef.current?.stopSearch();
     currentSearchRef.current = null;
@@ -332,10 +501,12 @@ export default function App() {
     if (!nextGame.isGameOver()) {
       void requestEngineMove(applied.fen);
     }
-  }, [clearSelection, fen, requestEngineMove]);
+  }, [clearSelection, commitPuzzleMove, fen, mode, requestEngineMove]);
 
   const handleSquare = useCallback((square: Square) => {
-    if (thinking || promotion || game.isGameOver() || game.turn() !== 'w') {
+    const canMove = mode === 'game' ? game.turn() === 'w' : puzzleCanMove;
+
+    if (thinking || promotion || game.isGameOver() || !canMove) {
       return;
     }
 
@@ -373,7 +544,7 @@ export default function App() {
     } else {
       clearSelection();
     }
-  }, [clearSelection, commitUserMove, game, legalMoves, promotion, selected, thinking]);
+  }, [clearSelection, commitUserMove, game, legalMoves, mode, promotion, puzzleCanMove, selected, thinking]);
 
   const resetGame = useCallback(() => {
     searchSerial.current += 1;
@@ -383,6 +554,10 @@ export default function App() {
       setEngineStatus('error');
       setEngineText(error instanceof Error ? error.message : 'Stockfish failed to reset');
     });
+    setMode('game');
+    setActivePuzzle(null);
+    setPuzzleMoveIndex(0);
+    setPuzzleFeedback(null);
     setGameState(createInitialGameState());
     setPromotion(null);
     setEngineInfo({});
@@ -441,7 +616,7 @@ export default function App() {
     }
   }, [updating]);
 
-  const status = getGameStatus(game, thinking, engineStatus, engineInfo);
+  const status = mode === 'puzzle' ? puzzleFeedback?.message ?? 'Puzzle trainer' : getGameStatus(game, thinking, engineStatus, engineInfo);
 
   return (
     <main className="app-shell">
@@ -489,6 +664,34 @@ export default function App() {
                 <div className="menu-status" data-state={engineStatus} title={engineText}>
                   {formatEngineInfo(engineStatus, engineInfo)}
                 </div>
+                <div className="puzzle-setup" aria-label="Puzzle setup">
+                  <label className="menu-number">
+                    <span>
+                      <Puzzle size={17} strokeWidth={2} aria-hidden="true" />
+                      Starting Elo
+                    </span>
+                    <input
+                      type="number"
+                      min="630"
+                      max="2429"
+                      step="50"
+                      value={startingPuzzleElo}
+                      onChange={(event) => setStartingPuzzleElo(Number(event.currentTarget.value))}
+                      onBlur={() => setStartingPuzzleElo((rating) => normalizePuzzleRating(rating))}
+                      aria-label="Starting puzzle Elo"
+                    />
+                  </label>
+                  <button className="menu-action" type="button" onClick={startPuzzleMode}>
+                    <Play size={18} strokeWidth={2} aria-hidden="true" />
+                    <span>{mode === 'puzzle' ? 'Restart puzzles' : 'Play puzzles'}</span>
+                  </button>
+                  {mode === 'puzzle' ? (
+                    <button className="menu-action" type="button" onClick={resetGame}>
+                      <X size={18} strokeWidth={2} aria-hidden="true" />
+                      <span>Stockfish game</span>
+                    </button>
+                  ) : null}
+                </div>
                 <button
                   className="menu-action"
                   type="button"
@@ -532,7 +735,7 @@ export default function App() {
         </div>
       </section>
 
-      <section className="board-stage" data-eval={showEvalBar || undefined} aria-label="Chess board">
+      <section className="board-stage" data-eval={showActiveEvalBar || undefined} aria-label="Chess board">
         <div className="board-wrap">
           <ChessBoard
             game={game}
@@ -557,9 +760,18 @@ export default function App() {
             </div>
           ) : null}
         </div>
-        {showEvalBar ? <EvaluationBar evaluation={activeEvaluation} /> : null}
+        {showActiveEvalBar ? <EvaluationBar evaluation={activeEvaluation} /> : null}
       </section>
 
+      {mode === 'puzzle' && activePuzzle ? (
+        <PuzzleHud
+          activePuzzle={activePuzzle}
+          trainer={puzzleTrainer}
+          feedback={puzzleFeedback}
+          onNext={goToNextPuzzle}
+          onExit={resetGame}
+        />
+      ) : null}
       <MoveHistory entries={gameState.entries} currentIndex={gameState.index} onSelect={goToHistoryIndex} />
       {updateNotice ? <div className="status-toast" role="status">{updateNotice}</div> : null}
       <div className="sr-only" aria-live="polite">{updateNotice ?? status}</div>
@@ -686,6 +898,73 @@ function EvaluationBar({ evaluation }: { evaluation: SearchEvaluation | null }) 
       <div className="eval-white" aria-hidden="true" />
       <span className="eval-label">{parsed?.label ?? '0.00'}</span>
     </aside>
+  );
+}
+
+function PuzzleHud({
+  activePuzzle,
+  trainer,
+  feedback,
+  onNext,
+  onExit
+}: {
+  activePuzzle: PreparedPuzzle;
+  trainer: PuzzleTrainerState;
+  feedback: PuzzleFeedback | null;
+  onNext(): void;
+  onExit(): void;
+}) {
+  const tags = formatPuzzleThemes(activePuzzle.puzzle.themes).slice(0, 4);
+  const accuracy = trainer.attempted > 0 ? Math.round((trainer.solved / trainer.attempted) * 100) : 0;
+
+  return (
+    <section className="puzzle-hud" aria-label="Puzzle trainer">
+      <div className="puzzle-metrics">
+        <span title="Current puzzle Elo">
+          <Target size={16} strokeWidth={2} aria-hidden="true" />
+          {trainer.rating}
+        </span>
+        <span title="Puzzle rating">
+          <Brain size={16} strokeWidth={2} aria-hidden="true" />
+          {activePuzzle.puzzle.rating}
+        </span>
+        <span title="Solved puzzles">
+          <Trophy size={16} strokeWidth={2} aria-hidden="true" />
+          {trainer.solved}/{trainer.attempted}
+        </span>
+        <span title="Accuracy">
+          <ChartNoAxesColumn size={16} strokeWidth={2} aria-hidden="true" />
+          {accuracy}%
+        </span>
+      </div>
+      <div className="puzzle-tags" aria-label="Puzzle themes">
+        {tags.map((tag) => (
+          <span key={tag}>{tag}</span>
+        ))}
+      </div>
+      {feedback ? (
+        <div className="puzzle-feedback" data-kind={feedback.kind} role="status">
+          {feedback.kind === 'missed' ? (
+            <CircleX size={17} strokeWidth={2.2} aria-hidden="true" />
+          ) : (
+            <CircleCheck size={17} strokeWidth={2.2} aria-hidden="true" />
+          )}
+          <span>{feedback.message}</span>
+        </div>
+      ) : null}
+      <div className="puzzle-actions">
+        {feedback?.complete ? (
+          <button className="puzzle-button" type="button" onClick={onNext}>
+            <Play size={17} strokeWidth={2} aria-hidden="true" />
+            <span>Next puzzle</span>
+          </button>
+        ) : null}
+        <button className="puzzle-button" type="button" onClick={onExit}>
+          <X size={17} strokeWidth={2} aria-hidden="true" />
+          <span>Stockfish game</span>
+        </button>
+      </div>
+    </section>
   );
 }
 

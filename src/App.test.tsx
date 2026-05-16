@@ -1,10 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import { createPuzzleTrainerState, preparePuzzle, selectNextPuzzle } from './puzzles/trainer';
 
 describe('App controls', () => {
   afterEach(() => {
     delete window.stockfish;
+    vi.restoreAllMocks();
   });
 
   it('keeps update and timing controls in the options menu', () => {
@@ -47,6 +49,38 @@ describe('App controls', () => {
     expect(screen.getByRole('button', { name: /white pawn on e4/i })).toBeTruthy();
   });
 
+  it('starts a puzzle session from the options menu with a chosen Elo', () => {
+    const { container } = render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /options/i }));
+
+    const eloInput = screen.getByLabelText(/starting puzzle elo/i);
+    fireEvent.change(eloInput, { target: { value: '900' } });
+    fireEvent.click(screen.getByRole('button', { name: /play puzzles/i }));
+
+    expect(screen.getByLabelText(/puzzle trainer/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /stockfish game/i })).toBeTruthy();
+    expect(container.querySelector('.eval-bar')).toBeNull();
+  });
+
+  it('accepts the expected puzzle line and enables the next puzzle action', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1);
+    const { container } = render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /options/i }));
+    fireEvent.change(screen.getByLabelText(/starting puzzle elo/i), { target: { value: '900' } });
+    fireEvent.click(screen.getByRole('button', { name: /play puzzles/i }));
+
+    const selectedPuzzle = selectNextPuzzle(createPuzzleTrainerState(900, 1));
+    const prepared = preparePuzzle(selectedPuzzle);
+    for (let index = 0; index < prepared.solutionMoves.length; index += 2) {
+      playUciMove(container, prepared.solutionMoves[index]);
+    }
+
+    expect(screen.getAllByText(/^Solved:/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /next puzzle/i })).toBeTruthy();
+  });
+
   it('lets Stockfish answer a white move while the evaluation bar is enabled', async () => {
     const stockfish = new FakeStockfish();
     window.stockfish = stockfish;
@@ -63,6 +97,43 @@ describe('App controls', () => {
     expect(stockfish.commands.some((command) => command.startsWith('position fen') && command.includes(' b '))).toBe(true);
   });
 });
+
+function playUciMove(container: HTMLElement, uci: string) {
+  const from = uci.slice(0, 2);
+  const to = uci.slice(2, 4);
+  fireEvent.click(squareButton(container, from));
+  fireEvent.click(squareButton(container, to));
+
+  const promotion = uci.slice(4, 5);
+  if (promotion) {
+    fireEvent.click(screen.getByRole('button', { name: `Promote to ${promotionName(promotion)}` }));
+  }
+}
+
+function squareButton(container: HTMLElement, square: string) {
+  const button = Array.from(container.querySelectorAll<HTMLButtonElement>('.square')).find((item) => {
+    const label = item.getAttribute('aria-label') ?? '';
+    return label === square || label.endsWith(` on ${square}`);
+  });
+
+  expect(button, square).toBeTruthy();
+  return button as HTMLButtonElement;
+}
+
+function promotionName(piece: string) {
+  switch (piece) {
+    case 'q':
+      return 'queen';
+    case 'r':
+      return 'rook';
+    case 'b':
+      return 'bishop';
+    case 'n':
+      return 'knight';
+    default:
+      return piece;
+  }
+}
 
 type LineCallback = (line: string) => void;
 type StatusCallback = (status: string) => void;

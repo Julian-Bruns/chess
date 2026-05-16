@@ -2,5 +2,23 @@
   "appVersion": "0.1.0",
   "buildNumber": "0",
   "commit": "",
-  "builtAt": ""
+  "builtAt": "",
+  "downloads": {
+    "macos": {
+      "appVersion": "0.1.0",
+      "path": "https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-macos.dmg"
+    },
+    "windows": {
+      "appVersion": "0.1.0",
+      "path": "https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-windows.exe"
+    },
+    "ios": {
+      "appVersion": "0.1.0",
+      "path": "https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-ios.ipa"
+    },
+    "android": {
+      "appVersion": "0.1.0",
+      "path": "https://github.com/Julian-Bruns/chess/releases/download/latest/chessfish-android.apk"
+    }
+  }
 }

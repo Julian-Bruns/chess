@@ -76,12 +76,31 @@ jobs:
       - name: Add bundled update manifest
         run: |
           APP_VERSION="$(node -p "require('./package.json').version")"
+          DOWNLOAD_BASE="https://github.com/${{ github.repository }}/releases/download/latest"
           cat > public/update-manifest.json <<EOF
           {
             "appVersion": "$APP_VERSION",
             "buildNumber": "${{ github.run_number }}",
             "commit": "${{ github.sha }}",
-            "builtAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            "builtAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "downloads": {
+              "macos": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-macos.dmg"
+              },
+              "windows": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-windows.exe"
+              },
+              "ios": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-ios.ipa"
+              },
+              "android": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-android.apk"
+              }
+            }
           }
           EOF
 
@@ -161,12 +180,31 @@ jobs:
       - name: Add bundled update manifest
         run: |
           APP_VERSION="$(node -p "require('./package.json').version")"
+          DOWNLOAD_BASE="https://github.com/${{ github.repository }}/releases/download/latest"
           cat > public/update-manifest.json <<EOF
           {
             "appVersion": "$APP_VERSION",
             "buildNumber": "${{ github.run_number }}",
             "commit": "${{ github.sha }}",
-            "builtAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            "builtAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "downloads": {
+              "macos": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-macos.dmg"
+              },
+              "windows": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-windows.exe"
+              },
+              "ios": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-ios.ipa"
+              },
+              "android": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-android.apk"
+              }
+            }
           }
           EOF
 
@@ -245,12 +283,31 @@ jobs:
       - name: Add update manifest
         run: |
           APP_VERSION="$(node -p "require('./package.json').version")"
+          DOWNLOAD_BASE="https://github.com/${{ github.repository }}/releases/download/latest"
           cat > release-assets/update-manifest.json <<EOF
           {
             "appVersion": "$APP_VERSION",
             "buildNumber": "${{ github.run_number }}",
             "commit": "${{ github.sha }}",
-            "builtAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            "builtAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "downloads": {
+              "macos": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-macos.dmg"
+              },
+              "windows": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-windows.exe"
+              },
+              "ios": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-ios.ipa"
+              },
+              "android": {
+                "appVersion": "$APP_VERSION",
+                "path": "$DOWNLOAD_BASE/chessfish-android.apk"
+              }
+            }
           }
           EOF
 
@@ -259,12 +316,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           DOWNLOAD_BASE="https://github.com/$GITHUB_REPOSITORY/releases/download/latest"
+          APP_VERSION="$(node -p "require('./package.json').version")"
           cat > release-notes.md <<EOF
           Chessfish is a local Stockfish chess app.
 
-          macOS: Download $DOWNLOAD_BASE/chessfish-macos.dmg, open it, and drag Chessfish to Applications.
+          App version: $APP_VERSION
 
-          Android: Download $DOWNLOAD_BASE/chessfish-android.apk, open it, and tap Install.
+          macOS ($APP_VERSION): Download $DOWNLOAD_BASE/chessfish-macos.dmg, open it, and drag Chessfish to Applications.
+
+          Windows ($APP_VERSION): Download $DOWNLOAD_BASE/chessfish-windows.exe and open the installer.
+
+          iOS ($APP_VERSION): Download $DOWNLOAD_BASE/chessfish-ios.ipa.
+
+          Android ($APP_VERSION): Download $DOWNLOAD_BASE/chessfish-android.apk, open it, and tap Install.
           EOF
 
           if gh release view latest >/dev/null 2>&1; then
